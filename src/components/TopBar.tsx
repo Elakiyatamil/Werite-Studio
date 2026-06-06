@@ -1,53 +1,116 @@
 // src/components/TopBar.tsx
-import React from 'react';
+import React from 'react'
 
-interface TopBarProps {
-  onExportPDF: () => void;
+interface Props {
+  onExportPDF: () => void
 }
 
-export const TopBar: React.FC<TopBarProps> = ({ onExportPDF }) => {
+export const TopBar: React.FC<Props> = ({ onExportPDF }) => {
   return (
-    <header className="topbar">
-      <div className="topbar-left">
-        <span className="breadcrumb-muted">Home</span>
-        <span className="breadcrumb-separator">/</span>
-        <span className="breadcrumb-muted">Fantasy</span>
-        <span className="breadcrumb-separator">/</span>
-        <span className="breadcrumb-active">Pretext Studio</span>
+    <div
+      style={{
+        height: 48,
+        background: '#141418',
+        borderBottom: '1px solid #2a2a3a',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '0 16px',
+        zIndex: 20,
+      }}
+    >
+      {/* Left Breadcrumb */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#6b6880' }}>
+        <span>Home</span>
+        <span style={{ color: '#3e3e52' }}>/</span>
+        <span>Fantasy</span>
+        <span style={{ color: '#3e3e52' }}>/</span>
+        <span style={{ color: '#c9a96e', fontWeight: 500 }}>Werite</span>
       </div>
-      <div className="topbar-center">
-        Pretext Studio
+
+      {/* Center Logo */}
+      <div
+        style={{
+          color: '#c9a96e',
+          fontWeight: 600,
+          fontSize: 18,
+          letterSpacing: 0.5,
+          fontFamily: 'Georgia, serif',
+        }}
+      >
+        ✦ Werite
       </div>
-      <div className="topbar-right">
-        <button className="topbar-icon" title="Refer a Friend">
-          <i className="ti ti-users"></i>
-        </button>
-        <button className="topbar-icon" title="Undo">
-          <i className="ti ti-arrow-back"></i>
-        </button>
-        <button className="topbar-icon" title="Redo">
-          <i className="ti ti-arrow-forward"></i>
-        </button>
-        <button className="topbar-icon" title="Desktop mode">
-          <i className="ti ti-device-desktop"></i>
-        </button>
-        <button className="topbar-icon" title="Help">
-          <i className="ti ti-help"></i>
-        </button>
-        <div className="topbar-search-container">
-          <i className="ti ti-search search-icon"></i>
-          <input className="topbar-search" type="text" placeholder="Search..." />
+
+      {/* Right Actions */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        {/* Cosmetic Search Bar */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            background: 'rgba(255,255,255,0.04)',
+            border: '1px solid #2a2a3a',
+            borderRadius: 4,
+            padding: '4px 8px',
+          }}
+        >
+          <input
+            placeholder="Search..."
+            disabled
+            style={{
+              background: 'none',
+              border: 'none',
+              outline: 'none',
+              color: '#b8b4d0',
+              fontSize: 12,
+              width: 100,
+              cursor: 'not-allowed',
+            }}
+          />
         </div>
-        <button className="topbar-icon" title="Settings">
-          <i className="ti ti-settings"></i>
+
+        {/* Export PDF Button */}
+        <button
+          onClick={onExportPDF}
+          style={{
+            padding: '5px 14px',
+            background: 'transparent',
+            border: '1px solid #c9a96e',
+            borderRadius: 5,
+            color: '#c9a96e',
+            fontSize: 12,
+            fontWeight: 500,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 5,
+            transition: 'all 0.15s',
+          }}
+        >
+          Export PDF
         </button>
-        <button className="topbar-icon" title="Export PDF" onClick={onExportPDF} style={{ color: 'var(--accent-gold)' }}>
-          <i className="ti ti-download"></i>
-        </button>
-        <div className="avatar" title="User Profile">
-          JO
+
+        {/* Avatar circle "LS" */}
+        <div
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg, #c9a96e, #e8c87a)',
+            color: '#141418',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontWeight: 700,
+            fontSize: 11,
+            letterSpacing: -0.5,
+            userSelect: 'none',
+          }}
+        >
+          LS
         </div>
       </div>
-    </header>
-  );
-};
+    </div>
+  )
+}

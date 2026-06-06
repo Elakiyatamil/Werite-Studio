@@ -1,42 +1,69 @@
 // src/components/LeftRail.tsx
-import React from 'react';
+import React from 'react'
 
-interface LeftRailProps {
-  isDrawerOpen: boolean;
-  onToggleDrawer: () => void;
-  onExportPDF: () => void;
+interface Props {
+  onExportPDF: () => void
 }
 
-export const LeftRail: React.FC<LeftRailProps> = ({
-  isDrawerOpen,
-  onToggleDrawer,
-  onExportPDF,
-}) => {
+export const LeftRail: React.FC<Props> = ({ onExportPDF }) => {
   return (
-    <div className="left-rail">
-      <button 
-        className={`rail-icon-btn ${isDrawerOpen ? 'active' : ''}`} 
-        title="Toggle Character Notes Sidebar"
-        onClick={onToggleDrawer}
+    <div
+      style={{
+        width: 48,
+        height: '100%',
+        background: '#1a1a22',
+        borderRight: '1px solid #2a2a3a',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        paddingTop: 16,
+        gap: 16,
+        boxSizing: 'border-box',
+      }}
+    >
+      {/* User Icon (no-op) */}
+      <button
+        style={{
+          width: 32,
+          height: 32,
+          borderRadius: 6,
+          background: 'none',
+          border: 'none',
+          color: '#6b6880',
+          cursor: 'default',
+          fontSize: 18,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+        title="User Profile"
       >
-        <i className="ti ti-layout-sidebar"></i>
+        👤
       </button>
-      <button className="rail-icon-btn" title="Manuscript Settings">
-        <i className="ti ti-file-text"></i>
-      </button>
-      <button className="rail-icon-btn" title="Image Manager">
-        <i className="ti ti-photo"></i>
-      </button>
-      <button className="rail-icon-btn" title="Export PDF" onClick={onExportPDF}>
-        <i className="ti ti-download"></i>
-      </button>
-      <div className="rail-separator"></div>
-      <button className="rail-icon-btn" title="Style Brush">
-        <i className="ti ti-pencil"></i>
-      </button>
-      <button className="rail-icon-btn" title="Clear Formatting">
-        <i className="ti ti-eraser"></i>
+
+      {/* Download/Export PDF Icon */}
+      <button
+        onClick={onExportPDF}
+        style={{
+          width: 32,
+          height: 32,
+          borderRadius: 6,
+          background: 'none',
+          border: 'none',
+          color: '#6b6880',
+          cursor: 'pointer',
+          fontSize: 18,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          transition: 'color 0.15s',
+        }}
+        title="Export PDF"
+        onMouseEnter={(e) => (e.currentTarget.style.color = '#c9a96e')}
+        onMouseLeave={(e) => (e.currentTarget.style.color = '#6b6880')}
+      >
+        📥
       </button>
     </div>
-  );
-};
+  )
+}

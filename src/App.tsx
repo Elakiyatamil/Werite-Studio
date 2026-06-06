@@ -1,201 +1,200 @@
 // src/App.tsx
-import { useMemo, useRef } from 'react';
-import { useDocumentState } from './hooks/useDocumentState';
-import { useContextMenu } from './hooks/useContextMenu';
-import { computeLayout } from './engine/layoutEngine';
-import { TopBar } from './components/TopBar';
-import { LeftRail } from './components/LeftRail';
-import { RightRail } from './components/RightRail';
-import { CharacterDrawer } from './components/CharacterDrawer';
-import { ColorPalettePanel } from './components/ColorPalettePanel';
-import { ContextMenu } from './components/ContextMenu';
-import { FloatingToolbar } from './components/FloatingToolbar';
-import { ImageThumbnailStrip } from './components/ImageThumbnailStrip';
-import { CanvasPage } from './components/CanvasPage';
-import { exportToPDF } from './engine/pdfExport';
+import React, { useState, useRef } from 'react'
+import { useDocumentState } from './hooks/useDocumentState'
+import { TopBar } from './components/TopBar'
+import { LeftRail } from './components/LeftRail'
+import { RightRail } from './components/RightRail'
+import { EditorPanel } from './components/EditorPanel'
+import { PageCanvas } from './components/PageCanvas'
+import { exportToPDF } from './engine/pdfExport'
 
 function App() {
   const {
-    text,
+    state,
+    pages,
+    preset,
     setText,
-    placedImages,
     addImage,
-    addBuiltInIcon,
+    moveImage,
+    resizeImage,
     updateImage,
     removeImage,
-    activeColor,
-    setActiveColor,
-    characters,
-    setCharacters,
-    addCharacter,
-    updateCharacter,
-    removeCharacter,
-    isLeftDrawerOpen,
-    setIsLeftDrawerOpen,
-    isColorPaletteOpen,
-    setIsColorPaletteOpen,
-  } = useDocumentState();
+    addShape,
+    addAnnotation,
+    updateAnnotation,
+    setSetting,
+  } = useDocumentState()
 
-  const {
-    isOpen: isContextMenuOpen,
-    x: contextMenuX,
-    y: contextMenuY,
-    open: openContextMenu,
-    close: closeContextMenu,
-  } = useContextMenu();
+  const [editorWidth, setEditorWidth] = useState(260)
+  const [shapeMode, setShapeMode] = useState<string | null>(null)
 
-  // Compute Layout lines from engine
-  const layoutLines = useMemo(() => {
-    return computeLayout(text, placedImages);
-  }, [text, placedImages]);
+  const pageRefs = useRef<(HTMLDivElement | null)[]>([])
 
-  // Determine total pages to render.
-  // We scan the layoutLines and find the maximum pageIndex.
-  const totalPages = useMemo(() => {
-    let maxIdx = 0;
-    layoutLines.forEach((line) => {
-      if (line.pageIndex > maxIdx) {
-        maxIdx = line.pageIndex;
-      }
-    });
-    // Ensure all images are accounted for. An image might be placed on a page
-    // past the text flow.
-    placedImages.forEach((img) => {
-      if (img.pageIndex > maxIdx) {
-        maxIdx = img.pageIndex;
-      }
-    });
-    return maxIdx + 1;
-  }, [layoutLines, placedImages]);
-
-  // Store page HTML element references for PDF export
-  const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const handleResizeMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault()
+    const onMouseMove = (me: MouseEvent) => {
+      const newWidth = Math.max(200, Math.min(480, me.clientX - 48))
+      setEditorWidth(newWidth)
+    }
+    const onMouseUp = () => {
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('mouseup', onMouseUp)
+    }
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('mouseup', onMouseUp)
+  }
 
   const handleExportPDF = async () => {
-    // Filter out null values
-    const elements = pageRefs.current.filter((el): el is HTMLDivElement => el !== null);
-    if (elements.length === 0) return;
-    await exportToPDF(elements);
-  };
+    const validPageElements = pageRefs.current.filter((el): el is HTMLDivElement => el !== null)
+    if (validPageElements.length === 0) return
+    await exportToPDF(validPageElements, preset)
+  }
 
-  const insertChapter = () => {
-    setText((prev) => `${prev.trim()}\n\n## CHAPTER 7: THE KEEPER'S SHADOW\n\n`);
-  };
+  const handlePageDoubleClick = (e: React.MouseEvent, pageIndex: number) => {
+    if (shapeMode) return // don't add note if we are in shape drawing mode
+    const rect = e.currentTarget.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+    addAnnotation(pageIndex, x, y)
+  }
 
-  const insertScene = () => {
-    setText((prev) => `${prev.trim()}\n\n* * *\n\n`);
-  };
-
-  const handleUploadImage = (src: string) => {
-    // Upload image to page index 0 or current last page
-    const pageIndex = totalPages - 1;
-    addImage(src, pageIndex);
-  };
-
-  const handleInsertIcon = (name: 'dragon' | 'castle' | 'quill' | 'candle' | 'compass') => {
-    const pageIndex = totalPages - 1;
-    // Calculate a default placement y offset depending on existing page height
-    const pageLines = layoutLines.filter((l) => l.pageIndex === pageIndex);
-    const lastLineY = pageLines.length > 0 ? pageLines[pageLines.length - 1].y : 100;
-    const yOffset = Math.min(600, lastLineY + 30);
-    addBuiltInIcon(name, pageIndex, yOffset);
-  };
+  const handleAddAnnotationAtDefault = () => {
+    const pageIndex = pages.length > 0 ? pages.length - 1 : 0
+    const x = preset.w / 2 - 80
+    const y = preset.h / 2 - 50
+    addAnnotation(pageIndex, x, y)
+  }
 
   return (
-    <div className="app-grid">
-      {/* 1. Top Bar */}
-      <div className="topbar-area">
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateRows: '48px 1fr',
+        gridTemplateColumns: `48px ${editorWidth}px 4px 1fr 48px`,
+        height: '100vh',
+        width: '100vw',
+        overflow: 'hidden',
+        background: '#0f0f14',
+      }}
+    >
+      {/* Top Bar */}
+      <div style={{ gridColumn: '1 / -1', gridRow: 1, zIndex: 10 }}>
         <TopBar onExportPDF={handleExportPDF} />
       </div>
 
-      {/* 2. Left Rail */}
-      <div className="left-rail-area">
-        <LeftRail
-          isDrawerOpen={isLeftDrawerOpen}
-          onToggleDrawer={() => setIsLeftDrawerOpen(!isLeftDrawerOpen)}
-          onExportPDF={handleExportPDF}
+      {/* Left Rail */}
+      <div style={{ gridColumn: 1, gridRow: 2, zIndex: 5 }}>
+        <LeftRail onExportPDF={handleExportPDF} />
+      </div>
+
+      {/* Editor Panel */}
+      <div style={{ gridColumn: 2, gridRow: 2, overflow: 'hidden' }}>
+        <EditorPanel
+          state={state}
+          onChangeText={setText}
+          onUploadImage={(src, float) => {
+            // Default y coordinate to place at the end of the text/current position
+            // We can place it at a standard offset like preset.mt + 100
+            addImage(src, float, preset.mt + 100, 0)
+          }}
+          onUpdateImage={updateImage}
+          onRemoveImage={removeImage}
+          shapeMode={shapeMode}
+          setShapeMode={setShapeMode}
+          onSetSetting={setSetting}
+          annotations={state.annotations}
+          onAddAnnotationAtDefault={handleAddAnnotationAtDefault}
         />
       </div>
 
-      {/* 3. Left Sliding Drawer */}
-      <CharacterDrawer
-        isOpen={isLeftDrawerOpen}
-        characters={characters}
-        setCharacters={setCharacters}
-        addCharacter={addCharacter}
-        updateCharacter={updateCharacter}
-        removeCharacter={removeCharacter}
+      {/* Resizable handle */}
+      <div
+        onMouseDown={handleResizeMouseDown}
+        style={{
+          gridColumn: 3,
+          gridRow: 2,
+          background: '#2a2a3a',
+          cursor: 'col-resize',
+          zIndex: 6,
+        }}
       />
 
-      {/* 4. Main Area (Floating panels + Canvas pages) */}
-      <div className="main-content-area">
-        <div className="canvas-scroller">
-          {/* Floating Action Pill Toolbar */}
-          <FloatingToolbar
-            onInsertChapter={insertChapter}
-            onInsertScene={insertScene}
-            onUploadImage={handleUploadImage}
-            onInsertIcon={handleInsertIcon}
-            onExportPDF={handleExportPDF}
+      {/* Page Canvas Scroll Area */}
+      <div
+        style={{
+          gridColumn: 4,
+          gridRow: 2,
+          background: '#0f0f14',
+          overflowY: 'scroll',
+          padding: 32,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 32,
+        }}
+      >
+        {/* Render stacked pages */}
+        {pages.map((page, idx) => (
+          <PageCanvas
+            key={page.pageIndex}
+            ref={(el) => {
+              pageRefs.current[idx] = el
+            }}
+            layout={page}
+            preset={preset}
+            onImageMove={moveImage}
+            onImageResize={resizeImage}
+            onAnnotationUpdate={updateAnnotation}
+            onDoubleClick={(e) => handlePageDoubleClick(e, page.pageIndex)}
+            shapeMode={shapeMode}
+            onShapeDrawn={addShape}
+            onSetSetting={setSetting}
           />
+        ))}
 
-          {/* Placed image thumbnail modification panel */}
-          <ImageThumbnailStrip
-            images={placedImages}
-            onUpdateImage={(id, changes) => updateImage(id, changes)}
-            onRemoveImage={removeImage}
-          />
-
-          {/* Render individual page elements */}
-          {Array.from({ length: totalPages }).map((_, idx) => {
-            const pageLines = layoutLines.filter((line) => line.pageIndex === idx);
-            const pageImages = placedImages.filter((img) => img.pageIndex === idx);
-
-            return (
-              <CanvasPage
-                key={idx}
-                ref={(el: HTMLDivElement | null) => {
-                  pageRefs.current[idx] = el;
-                }}
-                pageIndex={idx}
-                lines={pageLines}
-                images={pageImages}
-                text={text}
-                onChangeText={setText}
-                onUpdateImage={updateImage}
-                activeColor={activeColor}
-                onContextMenu={openContextMenu}
-              />
-            );
-          })}
+        {/* Footer actions inside canvas scroll area */}
+        <div style={{ display: 'flex', gap: 16, marginTop: 16, marginBottom: 48 }}>
+          <button
+            onClick={handleAddAnnotationAtDefault}
+            style={{
+              padding: '10px 20px',
+              background: 'rgba(201,169,110,0.12)',
+              border: '1px solid #c9a96e',
+              borderRadius: 6,
+              color: '#c9a96e',
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'all 0.15s',
+            }}
+          >
+            + Add Page Note
+          </button>
+          <button
+            onClick={handleExportPDF}
+            style={{
+              padding: '10px 20px',
+              background: '#c9a96e',
+              border: 'none',
+              borderRadius: 6,
+              color: '#141418',
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'all 0.15s',
+            }}
+          >
+            Export PDF
+          </button>
         </div>
       </div>
 
-      {/* 5. Right Rail */}
-      <div className="right-rail-area">
-        <RightRail
-          isColorOpen={isColorPaletteOpen}
-          onToggleColor={() => setIsColorPaletteOpen(!isColorPaletteOpen)}
-        />
+      {/* Right Rail */}
+      <div style={{ gridColumn: 5, gridRow: 2, zIndex: 5 }}>
+        <RightRail />
       </div>
-
-      {/* 6. Floating Color Panel */}
-      <ColorPalettePanel
-        isOpen={isColorPaletteOpen}
-        activeColor={activeColor}
-        onChangeColor={setActiveColor}
-      />
-
-      {/* 7. Right-Click Context Menu */}
-      <ContextMenu
-        isOpen={isContextMenuOpen}
-        x={contextMenuX}
-        y={contextMenuY}
-        onClose={closeContextMenu}
-        onInsertIcon={handleInsertIcon}
-      />
     </div>
-  );
+  )
 }
 
-export default App;
+export default App

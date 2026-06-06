@@ -1,161 +1,141 @@
 // src/hooks/useDocumentState.ts
-import { useState, useCallback } from 'react';
-import type { PlacedImage, FloatType, IconName } from '../types';
+import { useState, useMemo } from 'react'
+import type { DocumentState, PlacedImage, PlacedShape, PageAnnotation } from '../types'
+import { parseDocument } from '../engine/parseDocument'
+import { layoutDocument, invalidateCache } from '../engine/layoutEngine'
+import { FONTS, LINE_H, PAPERBACK_PRESETS } from '../engine/constants'
 
-const INITIAL_TEXT = `## Chapter One: The Gate of Blackthorn
+export const DEMO_TEXT = `## Chapter One: The Gate of Blackthorn
 
-The road had forgotten it was a road. Beneath the canopy of blackthorn and silver ash, it had become a suggestion — a parting of moss, an absence of trees where once there had been cart-ruts and the prints of iron-shod hooves. Elara followed it anyway, because suggestion was enough when you had nowhere else to go.
+The road had forgotten it was a road. Beneath the canopy of blackthorn and silver ash, it had become something older — a scar in the earth that the forest was slowly reclaiming, one root and one season at a time.
 
-She carried three things into the wilderness: a letter she had not yet read, a knife she had not yet used, and the name of a man who, according to every map she had consulted, did not exist.
+She carried three things into the wilderness: a letter she had not yet read, a knife she had not yet used, and a name she was not yet ready to speak aloud.
 
 The forest did not care about any of it.
 
 * * *
 
-By the time the gate appeared, the light had gone amber-grey and the blackthorns had grown close enough to brush her shoulders. The gate was iron — or had been iron, once. Now it was something older than iron, something that had eaten the rust and grown fat on it, its scrollwork twisted into shapes that her eyes refused to name.
+> The gate stood at the edge of memory, where maps ran out of words.
 
-She stopped three feet from it and read the name carved in the keystone: Kazad-Dul. Est. 741.`;
+By the time the gate appeared, the light had gone amber-grey and the blackthorns had grown close enough to touch her shoulders from both sides of the path. She did not slow down.
 
-export interface Character {
-  id: string;
-  name: string;
-  traits: string[];
-}
+She stopped three feet from it and read the name carved in the keystone: Kazad-Dul. Est. 741.
 
-const INITIAL_CHARACTERS: Character[] = [
-  {
-    id: 'char-1',
-    name: 'Kaelen',
-    traits: [
-      'Sworn protector of Elara',
-      'Carries the marking of Kazan',
-      'Silent and highly observant',
-    ],
-  },
-  {
-    id: 'char-2',
-    name: 'Elara',
-    traits: [
-      'Keeper of the Blackthorn key',
-      'Determined, seeking her heritage',
-      'Wears a silver leaf pendant',
-    ],
-  },
-];
+## Chapter Two: The Keeper's Name
 
-let nextId = 1;
+The Keeper had no face that she could remember afterward. Only hands — old, careful, ink-stained — and a voice that sounded like a page being turned.
+
+She asked the only question that mattered: **"How long has the gate been open?"**
+
+The Keeper considered this for *three full seconds* before answering.`
 
 export function useDocumentState() {
-  const [text, setText] = useState<string>(INITIAL_TEXT);
-  const [placedImages, setPlacedImages] = useState<PlacedImage[]>([]);
-  const [chapterTitle, setChapterTitle] = useState<string>('Chapter One: The Gate of Blackthorn');
-  const [draggingId, setDraggingId] = useState<string | null>(null);
-  
-  // New States for Color & Panel
-  const [activeColor, setActiveColor] = useState<string>('#1a1714'); // Parchment dark ink
-  const [characters, setCharacters] = useState<Character[]>(INITIAL_CHARACTERS);
-  
-  // Drawer open states
-  const [isLeftDrawerOpen, setIsLeftDrawerOpen] = useState<boolean>(false);
-  const [isColorPaletteOpen, setIsColorPaletteOpen] = useState<boolean>(false);
+  const [state, setState] = useState<DocumentState>({
+    rawText: DEMO_TEXT,
+    title: 'Untitled Novel',
+    bodyFont: FONTS.body,
+    fontSize: 16,
+    lineHeight: LINE_H,
+    paperbackPreset: 'A5 (148×210mm)',
+    images: [],
+    shapes: [],
+    annotations: [],
+    activeColor: '#1a1714',
+    highlightColor: '#fde68a',
+  })
 
-  const addImage = useCallback((src: string, pageIndex = 0): void => {
-    const img: PlacedImage = {
-      id: `img-${nextId++}`,
-      x: 280,
-      y: 120,
-      width: 160,
-      height: 120,
-      src,
-      float: 'right',
-      isBuiltIn: false,
-      pageIndex,
-    };
-    setPlacedImages(prev => [...prev, img]);
-  }, []);
+  const nodes = useMemo(() => parseDocument(state.rawText), [state.rawText])
 
-  const addBuiltInIcon = useCallback((iconName: IconName, pageIndex = 0, yOffset = 180): void => {
-    const img: PlacedImage = {
-      id: `icon-${nextId++}`,
-      x: 320,
-      y: yOffset,
-      width: 100,
-      height: 100,
-      src: '',
-      float: 'right',
-      isBuiltIn: true,
-      iconName,
-      pageIndex,
-    };
-    setPlacedImages(prev => [...prev, img]);
-  }, []);
+  const preset = PAPERBACK_PRESETS[state.paperbackPreset] ??
+                 PAPERBACK_PRESETS['A5 (148×210mm)']
 
-  const updateImage = useCallback((id: string, changes: Partial<PlacedImage>): void => {
-    setPlacedImages(prev =>
-      prev.map(img => (img.id === id ? { ...img, ...changes } : img))
-    );
-  }, []);
+  const fonts: typeof FONTS = useMemo(() => {
+    const size   = state.fontSize
+    const family = state.bodyFont.split(' ').slice(1).join(' ') || 'Georgia, serif'
+    return {
+      body:      `${size}px ${family}`,
+      chapter:   `bold ${Math.round(size * 1.4)}px ${family}`,
+      dropcap:   `bold ${size * 4}px ${family}`,
+      pullquote: `italic ${size - 1}px ${family}`,
+      ui:        FONTS.ui,
+    }
+  }, [state.bodyFont, state.fontSize])
 
-  const removeImage = useCallback((id: string): void => {
-    setPlacedImages(prev => prev.filter(img => img.id !== id));
-  }, []);
+  const lineH = state.lineHeight
 
-  const setImageFloat = useCallback((id: string, float: FloatType): void => {
-    updateImage(id, { float });
-  }, [updateImage]);
+  const pages = useMemo(
+    () => layoutDocument(nodes, state.images, state.shapes, state.annotations, fonts, lineH, preset),
+    [nodes, state.images, state.shapes, state.annotations, fonts, lineH, preset]
+  )
 
-  const setImageWidth = useCallback((id: string, width: number): void => {
-    updateImage(id, { width });
-  }, [updateImage]);
+  // Actions
+  function setText(rawText: string) {
+    setState(s => ({...s, rawText}))
+  }
 
-  // Character modifications
-  const addCharacter = useCallback((): void => {
-    const newChar: Character = {
-      id: `char-${nextId++}`,
-      name: 'New Character',
-      traits: ['Bullet trait 1', 'Bullet trait 2'],
-    };
-    setCharacters(prev => [...prev, newChar]);
-  }, []);
+  function addImage(src: string, float: PlacedImage['float'], insertY: number, pageIndex: number) {
+    const width = 160, height = 200
+    const x = float === 'right'
+      ? preset.w - preset.mr - width
+      : float === 'left' ? preset.ml : preset.ml + (preset.w - preset.ml - preset.mr - width) / 2
+    setState(s => ({
+      ...s,
+      images: [...s.images, {
+        id: crypto.randomUUID(), src, x, y: insertY,
+        width, height, float, pageIndex, opacity: 1,
+      }]
+    }))
+  }
 
-  const updateCharacter = useCallback((id: string, name: string, traits: string[]): void => {
-    setCharacters(prev =>
-      prev.map(c => (c.id === id ? { ...c, name, traits } : c))
-    );
-  }, []);
+  function moveImage(id: string, x: number, y: number) {
+    setState(s => ({ ...s, images: s.images.map(i => i.id === id ? {...i, x, y} : i) }))
+  }
 
-  const removeCharacter = useCallback((id: string): void => {
-    setCharacters(prev => prev.filter(c => c.id !== id));
-  }, []);
+  function resizeImage(id: string, w: number, h: number) {
+    setState(s => ({ ...s, images: s.images.map(i => i.id === id ? {...i, width:w, height:h} : i) }))
+  }
+
+  function updateImage(id: string, patch: Partial<PlacedImage>) {
+    setState(s => ({ ...s, images: s.images.map(i => i.id === id ? {...i, ...patch} : i) }))
+  }
+
+  function removeImage(id: string) {
+    setState(s => ({ ...s, images: s.images.filter(i => i.id !== id) }))
+  }
+
+  function addShape(shape: Omit<PlacedShape, 'id'>) {
+    setState(s => ({ ...s, shapes: [...s.shapes, { ...shape, id: crypto.randomUUID() }] }))
+  }
+
+  function updateShape(id: string, patch: Partial<PlacedShape>) {
+    setState(s => ({ ...s, shapes: s.shapes.map(sh => sh.id === id ? {...sh, ...patch} : sh) }))
+  }
+
+  function removeShape(id: string) {
+    setState(s => ({ ...s, shapes: s.shapes.filter(sh => sh.id !== id) }))
+  }
+
+  function addAnnotation(pageIndex: number, x: number, y: number) {
+    const ann: PageAnnotation = {
+      id: crypto.randomUUID(), pageIndex, text: '', x, y,
+      color: '#fef9c3', isOpen: true,
+    }
+    setState(s => ({ ...s, annotations: [...s.annotations, ann] }))
+  }
+
+  function updateAnnotation(id: string, patch: Partial<PageAnnotation>) {
+    setState(s => ({ ...s, annotations: s.annotations.map(a => a.id === id ? {...a, ...patch} : a) }))
+  }
+
+  function setSetting<K extends keyof DocumentState>(key: K, value: DocumentState[K]) {
+    if (key === 'bodyFont' || key === 'fontSize') invalidateCache()
+    setState(s => ({...s, [key]: value}))
+  }
 
   return {
-    text,
-    setText,
-    placedImages,
-    setPlacedImages,
-    chapterTitle,
-    setChapterTitle,
-    draggingId,
-    setDraggingId,
-    addImage,
-    addBuiltInIcon,
-    updateImage,
-    removeImage,
-    setImageFloat,
-    setImageWidth,
-    
-    // New exports
-    activeColor,
-    setActiveColor,
-    characters,
-    setCharacters,
-    addCharacter,
-    updateCharacter,
-    removeCharacter,
-
-    isLeftDrawerOpen,
-    setIsLeftDrawerOpen,
-    isColorPaletteOpen,
-    setIsColorPaletteOpen,
-  };
+    state, nodes, pages, preset, fonts, lineH,
+    setText, addImage, moveImage, resizeImage, updateImage, removeImage,
+    addShape, updateShape, removeShape,
+    addAnnotation, updateAnnotation, setSetting,
+  }
 }
